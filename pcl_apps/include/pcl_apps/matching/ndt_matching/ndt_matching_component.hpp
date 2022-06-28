@@ -59,6 +59,12 @@ extern "C" {
 #include <tf2/transform_datatypes.h>
 #include <tf2_eigen/tf2_eigen.h>
 
+#include <tf2/transform_datatypes.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/transform.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -69,7 +75,10 @@ extern "C" {
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/ndt.h>
+#include <pcl/registration/impl/ndt.hpp>
 #include <pcl/search/flann_search.h>
+#include <pclomp/ndt_omp.h>
+#include <pclomp/voxel_grid_covariance_omp.h>
 
 #include <boost/shared_ptr.hpp>
 
@@ -86,6 +95,7 @@ public:
 
 private:
   std::string reference_frame_id_;
+  std::string base_frame_id_;
   std::string reference_cloud_topic_;
   std::string input_cloud_topic_;
   std::string initial_pose_topic_;
@@ -93,19 +103,26 @@ private:
   double step_size_;
   double resolution_;
   int max_iterations_;
-  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> reference_cloud_;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
+  //pcl::PointCloud<pcl::PointXYZ>::Ptr reference_cloud_;
   bool reference_cloud_recieved_;
   bool initial_pose_recieved_;
   bool use_min_max_filter_;
   std::mutex ndt_map_mtx_;
   double scan_min_range_;
   double scan_max_range_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_reference_cloud_;
+  tf2_ros::Buffer tf_buffer_{get_clock()};
+  tf2_ros::TransformListener tf_listener_{tf_buffer_};
+  int omp_num_thread_;
+  void publishTF(const std::string frame_id, const std::string child_frame_id,const geometry_msgs::msg::PoseStamped pose);
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::ConstSharedPtr sub_reference_cloud_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_input_cloud_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_initial_pose_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr current_relative_pose_pub_;
   void updateRelativePose(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, rclcpp::Time stamp);
-  pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt_;
+  std::shared_ptr<pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>> ndt_;
+  //pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt_;
+  //std::shared_ptr<pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>> ndt_;
   geometry_msgs::msg::PoseStamped current_relative_pose_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_handler_ptr_;
 };

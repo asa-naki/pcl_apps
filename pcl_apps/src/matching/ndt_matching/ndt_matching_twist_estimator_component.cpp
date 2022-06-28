@@ -31,7 +31,7 @@ NdtMatchingTwistEstimatorComponent::NdtMatchingTwistEstimatorComponent(
   /* Static Parameters */
   declare_parameter("input_cloud_topic", get_name() + std::string("/input"));
   get_parameter("input_cloud_topic", input_cloud_topic_);
-  declare_parameter("input_frame_id", "base_link");
+  declare_parameter("input_frame_id", "velodyne");
   get_parameter("input_frame_id", input_cloud_frame_id_);
   /* Dynamic Parameters */
   declare_parameter("transform_epsilon", 1.0);
@@ -95,7 +95,8 @@ NdtMatchingTwistEstimatorComponent::NdtMatchingTwistEstimatorComponent(
       return *results;
     });
   // Setup Publisher
-  std::string output_topic_name = get_name() + std::string("/current_relative_pose");
+  //std::string output_topic_name = get_name() + std::string("/current_relative_pose");
+  std::string output_topic_name =std::string("/current_twist");
   current_twist_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(output_topic_name, 10);
   // Setup Subscriber
   buffer_ = boost::circular_buffer<pcl::PointCloud<pcl::PointXYZ>::Ptr>(2);
@@ -103,7 +104,7 @@ NdtMatchingTwistEstimatorComponent::NdtMatchingTwistEstimatorComponent(
   auto callback = [this](const typename sensor_msgs::msg::PointCloud2::SharedPtr msg) -> void {
     assert(input_cloud_frame_id_ == msg->header.frame_id);
     timestamps_.push_back(msg->header.stamp);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud;
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromROSMsg(*msg, *input_cloud);
     buffer_.push_back(input_cloud);
     boost::optional<geometry_msgs::msg::TwistStamped> twist = estimateCurrentTwist();
@@ -135,7 +136,7 @@ NdtMatchingTwistEstimatorComponent::estimateCurrentTwist()
     transform.rotation.z = 0.0;
     transform.rotation.w = 1.0;
     Eigen::Matrix4f mat = tf2::transformToEigen(transform).matrix().cast<float>();
-    pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     ndt_.align(*output_cloud, mat);
     Eigen::Matrix4f final_transform = ndt_.getFinalTransformation();
     tf2::Matrix3x3 rotation_mat;
